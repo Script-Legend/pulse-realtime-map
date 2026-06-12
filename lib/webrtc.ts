@@ -107,8 +107,12 @@ export class PeerSession {
     this.ignoreOffer = !this.polite && offerCollision;
     if (this.ignoreOffer) return;
 
-    await this.flushPendingCandidates();
+    // Set the remote description BEFORE flushing queued ICE candidates. Poll
+    // delivers the offer and its candidates in one batch (handled without
+    // awaiting), so candidates queue while this runs — flushing afterwards is
+    // what actually adds them, once a remote description exists.
     await this.pc.setRemoteDescription(desc);
+    await this.flushPendingCandidates();
     if (desc.type === "offer") {
       await this.pc.setLocalDescription();
       if (this.pc.localDescription) {
