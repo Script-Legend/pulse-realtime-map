@@ -34,30 +34,52 @@ export default function EntryGate({
   }
 
   return (
-    <div className="flex min-h-full flex-1 flex-col items-center justify-center gap-8 bg-zinc-950 p-6 text-zinc-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Pulse</h1>
-        <p className="mt-2 max-w-sm text-zinc-400">
-          A living globe of anonymous strangers. Drop onto the map and connect.
-        </p>
+    <div className="relative flex min-h-full flex-1 flex-col items-center justify-center overflow-hidden bg-[#06070a] p-6 text-zinc-100">
+      {/* Radar rings rippling out behind the hero */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="radar-ring h-[340px] w-[340px]" style={{ animationDelay: "0s" }} />
+        <div className="radar-ring h-[340px] w-[340px]" style={{ animationDelay: "1.5s" }} />
+        <div className="radar-ring h-[340px] w-[340px]" style={{ animationDelay: "3s" }} />
       </div>
 
-      <button
-        onClick={enter}
-        disabled={status === "locating"}
-        className="rounded-full bg-emerald-400 px-8 py-3 font-semibold text-zinc-950 transition hover:bg-emerald-300 disabled:opacity-60"
-      >
-        {status === "locating" ? "Locating…" : "Enter Pulse"}
-      </button>
+      {/* Soft color glows */}
+      <div className="pointer-events-none absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 bottom-1/4 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
 
-      {status === "error" && (
-        <p className="max-w-sm text-center text-sm text-red-400">{error}</p>
-      )}
+      <div className="animate-fade-in relative z-10 flex flex-col items-center text-center">
+        {/* Pulsing core */}
+        <div className="relative mb-8 flex h-16 w-16 items-center justify-center">
+          <span className="status-dot absolute h-16 w-16 rounded-full border border-emerald-400/40" />
+          <span className="h-4 w-4 rounded-full bg-emerald-400 shadow-[0_0_24px_6px_rgba(52,211,153,0.8)]" />
+        </div>
 
-      <p className="max-w-sm text-center text-xs text-zinc-500">
-        No sign-up. Your dot is placed 1–3&nbsp;km from your real location.
-        Nothing is stored — closing the tab ends everything.
-      </p>
+        <h1 className="bg-gradient-to-r from-emerald-300 via-emerald-400 to-cyan-300 bg-clip-text text-6xl font-bold tracking-tight text-transparent">
+          Pulse
+        </h1>
+        <p className="mt-4 max-w-sm text-pretty text-zinc-400">
+          A living globe of anonymous strangers. Drop onto the map and connect —
+          no sign-up, no history.
+        </p>
+
+        <button
+          onClick={enter}
+          disabled={status === "locating"}
+          className="glow-emerald mt-10 rounded-full bg-emerald-400 px-10 py-3.5 font-semibold text-zinc-950 transition hover:scale-[1.03] hover:bg-emerald-300 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+        >
+          {status === "locating" ? "Locating…" : "Enter Pulse"}
+        </button>
+
+        {status === "error" && (
+          <p className="animate-fade-in mt-5 max-w-sm text-center text-sm text-red-400">
+            {error}
+          </p>
+        )}
+
+        <p className="mt-10 max-w-xs text-center text-xs leading-relaxed text-zinc-600">
+          Your dot is placed 1–3&nbsp;km from your real location. Nothing is
+          stored — closing the tab ends everything.
+        </p>
+      </div>
     </div>
   );
 }
