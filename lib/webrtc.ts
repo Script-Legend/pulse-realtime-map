@@ -17,8 +17,30 @@ interface PeerCallbacks {
   onChannelOpen: () => void;
 }
 
+// STUN finds a direct path; TURN relays when none exists (e.g. two peers behind
+// the same NAT, or strict/symmetric NATs). The TURN entries below are Open
+// Relay's free public servers — fine for a demo, but rate-limited; swap in your
+// own TURN credentials for production. The 443/TCP entry also tunnels through
+// firewalls that only allow HTTPS-looking traffic.
 const ICE_CONFIG: RTCConfiguration = {
-  iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    {
+      urls: "turn:openrelay.metered.ca:80",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+    {
+      urls: "turn:openrelay.metered.ca:443?transport=tcp",
+      username: "openrelayproject",
+      credential: "openrelayproject",
+    },
+  ],
 };
 
 export class PeerSession {
