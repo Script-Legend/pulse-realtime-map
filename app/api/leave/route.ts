@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySession, isValidId } from "@/lib/session";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,6 +12,10 @@ export const dynamic = "force-dynamic";
 // the caller owns this session, so one user can't delete another.
 export async function POST(request: NextRequest) {
   try {
+    if (!rateLimit(`leave:${clientIp(request.headers)}`, 60, 60_000)) {
+      return Response.json({ error: "rate limited" }, { status: 429 });
+    }
+
     let id: unknown;
     let secret: unknown;
     try {

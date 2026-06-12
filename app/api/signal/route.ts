@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySession, isValidId } from "@/lib/session";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 import type { SignalType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -25,6 +26,10 @@ const MAX_PAYLOAD = 64 * 1024; // SDP/ICE are small; cap to be safe.
 // tamper with someone else's busy state.
 export async function POST(request: NextRequest) {
   try {
+    if (!rateLimit(`signal:${clientIp(request.headers)}`, 600, 60_000)) {
+      return Response.json({ error: "rate limited" }, { status: 429 });
+    }
+
     let body: unknown;
     try {
       body = await request.json();

@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
 import { verifySession, isValidId } from "@/lib/session";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 import type { PollResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 // cannot heartbeat or drain another user's mailbox.
 export async function GET(request: NextRequest) {
   try {
+    if (!rateLimit(`poll:${clientIp(request.headers)}`, 300, 60_000)) {
+      return Response.json({ error: "rate limited" }, { status: 429 });
+    }
+
     const id = request.nextUrl.searchParams.get("id");
     if (!isValidId(id)) {
       return Response.json({ error: "invalid id" }, { status: 400 });

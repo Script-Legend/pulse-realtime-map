@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
 import { isValidId } from "@/lib/session";
+import { rateLimit, clientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,10 @@ export const dynamic = "force-dynamic";
 // present on later requests to prove it owns this session id.
 export async function POST(request: NextRequest) {
   try {
+    if (!rateLimit(`join:${clientIp(request.headers)}`, 20, 60_000)) {
+      return Response.json({ error: "rate limited" }, { status: 429 });
+    }
+
     let body: unknown;
     try {
       body = await request.json();
