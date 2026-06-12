@@ -9,6 +9,7 @@ import VideoPanel from "./components/VideoPanel";
 import { join, leave, poll, sendSignal } from "@/lib/api";
 import { PeerSession, type DescType, type PeerControl } from "@/lib/webrtc";
 import { POLL_INTERVAL_MS } from "@/lib/presence";
+import { dlog } from "@/lib/debug";
 import { type PeerDot, type SignalMsg } from "@/lib/types";
 
 type Conn =
@@ -38,6 +39,7 @@ export default function Home() {
   const [conn, _setConn] = useState<Conn>({ kind: "idle" });
   const connRef = useRef<Conn>(conn);
   const setConn = (c: Conn) => {
+    dlog("conn:", c.kind);
     connRef.current = c;
     _setConn(c);
   };
@@ -216,6 +218,7 @@ export default function Home() {
   }
 
   function processSignal(sig: SignalMsg) {
+    dlog("recv signal:", sig.type, "from", sig.fromId.slice(0, 8));
     switch (sig.type) {
       case "request": {
         if (connRef.current.kind === "idle") {
@@ -286,9 +289,13 @@ export default function Home() {
       try {
         const data = await poll(sessionId);
         if (!active) return;
+        if (data.signals.length > 0)
+          dlog("poll: drained", data.signals.length, "signal(s);", data.peers.length, "peer(s)");
         setPeers(data.peers);
         for (const s of data.signals) processSignalRef.current(s);
-      } catch {}
+      } catch (e) {
+        dlog("poll error:", e);
+      }
       if (active) timer = setTimeout(tick, POLL_INTERVAL_MS);
     };
     tick();

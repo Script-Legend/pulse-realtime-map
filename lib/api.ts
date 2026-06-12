@@ -1,5 +1,6 @@
 // Client-side helpers for talking to the coordination API.
 import type { PollResponse, SignalType } from "@/lib/types";
+import { dlog } from "@/lib/debug";
 
 // The per-session secret issued by /api/join. Kept in module scope so callers
 // don't have to thread it through every request. It proves we own our session
@@ -49,6 +50,7 @@ export async function join(
       // ignore — without a secret, later requests will be rejected
     }
   }
+  dlog("join ->", res ? res.status : "no response", "| secret:", sessionSecret ? "set" : "MISSING");
 }
 
 export async function poll(id: string): Promise<PollResponse> {
@@ -73,7 +75,9 @@ export async function sendSignal(
     "/api/signal",
     JSON.stringify({ fromId, toId, type, payload, secret: sessionSecret }),
   );
-  return !!res && res.ok;
+  const ok = !!res && res.ok;
+  dlog("signal sent:", type, "->", ok ? "OK" : `FAILED (${res ? res.status : "no response"})`);
+  return ok;
 }
 
 // Fire-and-forget leave that survives the tab closing.

@@ -1,3 +1,5 @@
+import { dlog } from "@/lib/debug";
+
 export type DescType = "offer" | "answer" | "ice";
 export type PeerControl =
   | "video-request"
@@ -46,6 +48,7 @@ export class PeerSession {
         this.makingOffer = true;
         await this.pc.setLocalDescription();
         if (this.pc.localDescription) {
+          dlog("negotiation -> sending offer");
           this.cb.onSignal("offer", JSON.stringify(this.pc.localDescription));
         }
       } finally {
@@ -54,11 +57,17 @@ export class PeerSession {
     };
 
     this.pc.ontrack = ({ streams }) => {
+      dlog("remote track received");
       this.cb.onRemoteStream(streams[0] ?? null);
     };
 
     this.pc.onconnectionstatechange = () => {
+      dlog("connectionState:", this.pc.connectionState);
       this.cb.onConnectionState(this.pc.connectionState);
+    };
+
+    this.pc.oniceconnectionstatechange = () => {
+      dlog("iceConnectionState:", this.pc.iceConnectionState);
     };
 
     if (initiator) {
@@ -73,7 +82,10 @@ export class PeerSession {
   }
 
   private wireDataChannel(dc: RTCDataChannel) {
-    dc.onopen = () => this.cb.onChannelOpen();
+    dc.onopen = () => {
+      dlog("datachannel OPEN");
+      this.cb.onChannelOpen();
+    };
     dc.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data as string);
@@ -90,6 +102,7 @@ export class PeerSession {
 
   async handleSignal(type: DescType, payload: string) {
     if (this.closed) return;
+    dlog("recv signal:", type);
     const data = JSON.parse(payload);
 
     if (type === "ice") {
@@ -99,7 +112,9 @@ export class PeerSession {
       }
       try {
         await this.pc.addIceCandidate(data);
-      } catch {}
+      } catch (e) {
+        dlog("addIceCandidate failed:", e);
+      }
       return;
     }
 
@@ -128,10 +143,13 @@ export class PeerSession {
     if (this.pendingCandidates.length === 0) return;
     const queued = this.pendingCandidates;
     this.pendingCandidates = [];
+    dlog("flushing", queued.length, "queued ICE candidate(s)");
     for (const candidate of queued) {
       try {
         await this.pc.addIceCandidate(candidate);
-      } catch {}
+      } catch (e) {
+        dlog("addIceCandidate (flush) failed:", e);
+      }
     }
   }
 
