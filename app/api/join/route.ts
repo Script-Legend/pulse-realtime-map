@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
 
@@ -7,7 +8,8 @@ export const dynamic = "force-dynamic";
 
 // POST /api/join — body { id, lat, lng } (raw coords).
 // Applies a 1–3 km privacy offset and upserts the presence row. Raw
-// coordinates are never stored.
+// coordinates are never stored. Returns a per-session `secret` the client must
+// present on later requests to prove it owns this session id.
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -26,6 +28,7 @@ export async function POST(request: NextRequest) {
   }
 
   const offset = applyPrivacyOffset(lat as number, lng as number);
+  const secret = randomUUID();
 
   await prisma.presence.upsert({
     where: { id },
@@ -35,13 +38,15 @@ export async function POST(request: NextRequest) {
       lng: offset.lng,
       busy: false,
       lastSeen: new Date(),
+      secret,
     },
     update: {
       lat: offset.lat,
       lng: offset.lng,
       lastSeen: new Date(),
+      secret,
     },
   });
 
-  return Response.json({ ok: true });
+  return Response.json({ ok: true, secret });
 }

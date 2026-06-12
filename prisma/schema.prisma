@@ -17,6 +17,7 @@ model Presence {
   lng      Float
   busy     Boolean  @default(false) // true while in an active connection
   lastSeen DateTime
+  secret   String? // server-issued per-session token; proves ownership, never exposed to peers
 
   @@index([lastSeen])
 }

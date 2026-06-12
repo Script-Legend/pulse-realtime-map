@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { verifySession } from "@/lib/session";
 import type { SignalType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -17,9 +18,11 @@ const VALID_TYPES: SignalType[] = [
 
 const MAX_PAYLOAD = 64 * 1024; // SDP/ICE are small; cap to be safe.
 
-// POST /api/signal — body { fromId, toId, type, payload? }
+// POST /api/signal — body { fromId, toId, type, payload?, secret }
 // Drops one message into the recipient's mailbox. Also manages the `busy`
-// flag so a user can only be in one connection at a time.
+// flag so a user can only be in one connection at a time. The secret proves
+// the caller really is `fromId`, so nobody can impersonate another session or
+// tamper with someone else's busy state.
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -28,7 +31,7 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const { fromId, toId, type, payload } = (body ?? {}) as Record<
+  const { fromId, toId, type, payload, secret } = (body ?? {}) as Record<
     string,
     unknown
   >;
@@ -45,6 +48,11 @@ export async function POST(request: NextRequest) {
     (typeof payload !== "string" || payload.length > MAX_PAYLOAD)
   ) {
     return Response.json({ error: "invalid payload" }, { status: 400 });
+  }
+
+  // The sender must prove it owns `fromId` before we act on its behalf.
+  if (!(await verifySession(fromId, secret))) {
+    return Response.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const signalType = type as SignalType;
