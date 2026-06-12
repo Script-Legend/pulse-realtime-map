@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
+import { isValidId } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,42 +12,47 @@ export const dynamic = "force-dynamic";
 // coordinates are never stored. Returns a per-session `secret` the client must
 // present on later requests to prove it owns this session id.
 export async function POST(request: NextRequest) {
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "invalid body" }, { status: 400 });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "invalid body" }, { status: 400 });
+    }
+
+    const { id, lat, lng } = (body ?? {}) as Record<string, unknown>;
+
+    if (!isValidId(id)) {
+      return Response.json({ error: "invalid id" }, { status: 400 });
+    }
+    if (!isValidLatLng(lat, lng)) {
+      return Response.json({ error: "invalid coordinates" }, { status: 400 });
+    }
+
+    const offset = applyPrivacyOffset(lat as number, lng as number);
+    const secret = randomUUID();
+
+    await prisma.presence.upsert({
+      where: { id },
+      create: {
+        id,
+        lat: offset.lat,
+        lng: offset.lng,
+        busy: false,
+        lastSeen: new Date(),
+        secret,
+      },
+      update: {
+        lat: offset.lat,
+        lng: offset.lng,
+        lastSeen: new Date(),
+        secret,
+      },
+    });
+
+    return Response.json({ ok: true, secret });
+  } catch (err) {
+    console.error("[api/join]", err);
+    return Response.json({ error: "server error" }, { status: 500 });
   }
-
-  const { id, lat, lng } = (body ?? {}) as Record<string, unknown>;
-
-  if (typeof id !== "string" || id.length < 8 || id.length > 64) {
-    return Response.json({ error: "invalid id" }, { status: 400 });
-  }
-  if (!isValidLatLng(lat, lng)) {
-    return Response.json({ error: "invalid coordinates" }, { status: 400 });
-  }
-
-  const offset = applyPrivacyOffset(lat as number, lng as number);
-  const secret = randomUUID();
-
-  await prisma.presence.upsert({
-    where: { id },
-    create: {
-      id,
-      lat: offset.lat,
-      lng: offset.lng,
-      busy: false,
-      lastSeen: new Date(),
-      secret,
-    },
-    update: {
-      lat: offset.lat,
-      lng: offset.lng,
-      lastSeen: new Date(),
-      secret,
-    },
-  });
-
-  return Response.json({ ok: true, secret });
 }

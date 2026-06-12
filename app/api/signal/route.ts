@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifySession } from "@/lib/session";
+import { verifySession, isValidId } from "@/lib/session";
 import type { SignalType } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -24,78 +24,79 @@ const MAX_PAYLOAD = 64 * 1024; // SDP/ICE are small; cap to be safe.
 // the caller really is `fromId`, so nobody can impersonate another session or
 // tamper with someone else's busy state.
 export async function POST(request: NextRequest) {
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return Response.json({ error: "invalid body" }, { status: 400 });
-  }
-
-  const { fromId, toId, type, payload, secret } = (body ?? {}) as Record<
-    string,
-    unknown
-  >;
-
-  if (typeof fromId !== "string" || typeof toId !== "string") {
-    return Response.json({ error: "invalid ids" }, { status: 400 });
-  }
-  if (typeof type !== "string" || !VALID_TYPES.includes(type as SignalType)) {
-    return Response.json({ error: "invalid type" }, { status: 400 });
-  }
-  if (
-    payload !== undefined &&
-    payload !== null &&
-    (typeof payload !== "string" || payload.length > MAX_PAYLOAD)
-  ) {
-    return Response.json({ error: "invalid payload" }, { status: 400 });
-  }
-
-  // The sender must prove it owns `fromId` before we act on its behalf.
-  if (!(await verifySession(fromId, secret))) {
-    return Response.json({ error: "unauthorized" }, { status: 401 });
-  }
-
-  const signalType = type as SignalType;
-  const payloadStr = typeof payload === "string" ? payload : null;
-
-  // Enforce "one active connection at a time": if the target is already busy,
-  // auto-decline the request instead of delivering it.
-  if (signalType === "request") {
-    const target = await prisma.presence.findUnique({
-      where: { id: toId },
-      select: { busy: true },
-    });
-    if (!target) {
-      // Target went offline — tell the initiator it was declined.
-      await sendDecline(toId, fromId);
-      return Response.json({ ok: true, autoDeclined: true });
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "invalid body" }, { status: 400 });
     }
-    if (target.busy) {
-      await sendDecline(toId, fromId);
-      return Response.json({ ok: true, autoDeclined: true });
+
+    const { fromId, toId, type, payload, secret } = (body ?? {}) as Record<
+      string,
+      unknown
+    >;
+
+    if (!isValidId(fromId) || !isValidId(toId)) {
+      return Response.json({ error: "invalid ids" }, { status: 400 });
     }
-  }
+    if (typeof type !== "string" || !VALID_TYPES.includes(type as SignalType)) {
+      return Response.json({ error: "invalid type" }, { status: 400 });
+    }
+    if (
+      payload !== undefined &&
+      payload !== null &&
+      (typeof payload !== "string" || payload.length > MAX_PAYLOAD)
+    ) {
+      return Response.json({ error: "invalid payload" }, { status: 400 });
+    }
 
-  // Busy transitions:
-  // - accept: the connection is now active → mark BOTH peers busy.
-  // - decline/end: free both peers.
-  if (signalType === "accept") {
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: true },
+    // The sender must prove it owns `fromId` before we act on its behalf.
+    if (!(await verifySession(fromId, secret))) {
+      return Response.json({ error: "unauthorized" }, { status: 401 });
+    }
+
+    const signalType = type as SignalType;
+    const payloadStr = typeof payload === "string" ? payload : null;
+
+    // Enforce "one active connection at a time": if the target is already busy,
+    // auto-decline the request instead of delivering it.
+    if (signalType === "request") {
+      const target = await prisma.presence.findUnique({
+        where: { id: toId },
+        select: { busy: true },
+      });
+      if (!target || target.busy) {
+        // Target offline or busy — tell the initiator it was declined.
+        await sendDecline(toId, fromId);
+        return Response.json({ ok: true, autoDeclined: true });
+      }
+    }
+
+    // Busy transitions:
+    // - accept: the connection is now active → mark BOTH peers busy.
+    // - decline/end: free both peers.
+    if (signalType === "accept") {
+      await prisma.presence.updateMany({
+        where: { id: { in: [fromId, toId] } },
+        data: { busy: true },
+      });
+    } else if (signalType === "decline" || signalType === "end") {
+      await prisma.presence.updateMany({
+        where: { id: { in: [fromId, toId] } },
+        data: { busy: false },
+      });
+    }
+
+    await prisma.signal.create({
+      data: { fromId, toId, type: signalType, payload: payloadStr },
     });
-  } else if (signalType === "decline" || signalType === "end") {
-    await prisma.presence.updateMany({
-      where: { id: { in: [fromId, toId] } },
-      data: { busy: false },
-    });
+
+    return Response.json({ ok: true });
+  } catch (err) {
+    console.error("[api/signal]", err);
+    return Response.json({ error: "server error" }, { status: 500 });
   }
-
-  await prisma.signal.create({
-    data: { fromId, toId, type: signalType, payload: payloadStr },
-  });
-
-  return Response.json({ ok: true });
 }
 
 // Helper: deliver an auto-decline from `target` back to `initiator`.
