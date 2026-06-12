@@ -92,9 +92,9 @@ export default function WorldMap({
         const el = document.createElement("div");
         el.className = "pulse-me";
         el.title = "You are here";
-        el.innerHTML = `<span class="pulse-me-label">Me</span>📍`;
-        // anchor "bottom" → the pin's tip sits on the exact coordinate.
-        meMarkerRef.current = new mapboxgl.Marker({ element: el, anchor: "bottom" })
+        el.innerHTML = `<span class="pulse-me-label">You</span><span class="pulse-me-dot"></span>`;
+        // Centered so the beacon sits on the exact coordinate.
+        meMarkerRef.current = new mapboxgl.Marker({ element: el })
           .setLngLat([me.lng, me.lat])
           .addTo(map);
       } else {
@@ -125,7 +125,9 @@ export default function WorldMap({
         if (!marker) {
           const el = document.createElement("button");
           el.className = "pulse-dot";
-          el.style.background = dotColor(peer.id);
+          // `color` drives both the fill (background: currentColor) and the
+          // glow/radar ring in CSS, so each dot pulses in its own hue.
+          el.style.color = dotColor(peer.id);
           el.title = "Tap to connect";
           el.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -168,7 +170,8 @@ export default function WorldMap({
       )}
 
       {/* Online count */}
-      <div className="absolute bottom-4 left-4 rounded-full bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-300 backdrop-blur">
+      <div className="glass absolute bottom-5 left-5 flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-zinc-200 shadow-lg">
+        <span className="status-dot h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_2px_rgba(52,211,153,0.85)]" />
         {peers.length} online
       </div>
     </div>
