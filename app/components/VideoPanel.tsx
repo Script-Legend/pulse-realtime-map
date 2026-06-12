@@ -27,7 +27,7 @@ export default function VideoPanel({
   }, [remoteStream]);
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col bg-black">
+    <div className="animate-fade-in absolute inset-0 z-30 flex flex-col bg-black">
       <div className="relative flex-1">
         {/* Remote (full screen) */}
         <video
@@ -37,7 +37,8 @@ export default function VideoPanel({
           className="h-full w-full bg-zinc-900 object-cover"
         />
         {!remoteStream && (
-          <div className="absolute inset-0 flex items-center justify-center text-zinc-500">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-zinc-500">
+            <span className="status-dot h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_10px_3px_rgba(52,211,153,0.7)]" />
             Waiting for stranger&rsquo;s video…
           </div>
         )}
@@ -47,13 +48,15 @@ export default function VideoPanel({
           autoPlay
           playsInline
           muted
-          className="absolute bottom-4 right-4 h-40 w-28 rounded-lg border border-zinc-700 bg-zinc-800 object-cover"
+          className="absolute bottom-4 right-4 h-40 w-28 rounded-xl border border-white/15 bg-zinc-800 object-cover shadow-xl ring-1 ring-black/40"
         />
+        {/* Gradient so controls stay legible over bright video */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent" />
       </div>
       <div className="flex justify-center bg-zinc-950 p-4">
         <button
           onClick={onEnd}
-          className="rounded-full bg-red-500 px-8 py-3 font-semibold text-white hover:bg-red-400"
+          className="rounded-full bg-red-500 px-8 py-3 font-semibold text-white shadow-lg transition hover:bg-red-400 active:scale-95"
         >
           End video
         </button>
