@@ -1,79 +1,207 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #06070a;
+  --foreground: #ededed;
+  --accent: #34d399; /* emerald-400 */
+  --accent-cyan: #22d3ee; /* cyan-400 */
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  /* Soft radial glow behind everything for depth. */
+  background-image:
+    radial-gradient(900px circle at 15% 20%, rgba(52, 211, 153, 0.08), transparent 55%),
+    radial-gradient(900px circle at 85% 80%, rgba(34, 211, 238, 0.08), transparent 55%);
+  background-attachment: fixed;
 }
 
-/* Live user dots on the map */
+/* ------------------------------------------------------------------ */
+/* Live user dots on the map — the signature "pulse".                  */
+/* Each dot glows in its own color (set via `color` in WorldMap) and   */
+/* sends out an expanding radar ring.                                   */
+/* ------------------------------------------------------------------ */
 .pulse-dot {
-  width: 14px;
-  height: 14px;
+  position: relative;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
   border: 2px solid rgba(255, 255, 255, 0.9);
+  background: currentColor;
   cursor: pointer;
   padding: 0;
-  box-shadow: 0 0 0 rgba(255, 255, 255, 0.5);
-  animation: pulse-ring 2s ease-out infinite;
-  transition: transform 0.1s ease;
+  box-shadow:
+    0 0 12px 2px currentColor,
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.pulse-dot::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  opacity: 0.7;
+  animation: pulse-radar 2.4s ease-out infinite;
+  pointer-events: none;
 }
 
 .pulse-dot:hover {
-  transform: scale(1.3);
+  transform: scale(1.4);
 }
 
-/* The user's own "you are here" pin — small, sized like the dots. */
+@keyframes pulse-radar {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(3.4);
+    opacity: 0;
+  }
+}
+
+/* The user's own "you are here" beacon — a glowing emerald dot with a  */
+/* label and its own radar ring.                                        */
 .pulse-me {
   position: relative;
-  font-size: 18px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
   cursor: default;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.pulse-me-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 16px 3px rgba(52, 211, 153, 0.9);
+}
+
+.pulse-me::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--accent);
+  opacity: 0.7;
+  animation: pulse-radar 2.4s ease-out infinite;
+  pointer-events: none;
 }
 
 .pulse-me-label {
   position: absolute;
-  bottom: 100%;
+  bottom: 130%;
   left: 50%;
   transform: translateX(-50%);
-  margin-bottom: 1px;
   font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.04em;
   color: #ffffff;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 0 5px;
+  background: rgba(6, 7, 10, 0.75);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  padding: 1px 7px;
   border-radius: 9999px;
   white-space: nowrap;
 }
 
-@keyframes pulse-ring {
-  0% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
-  }
-  70% {
-    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+/* ------------------------------------------------------------------ */
+/* Reusable UI primitives                                              */
+/* ------------------------------------------------------------------ */
+.glass {
+  background: rgba(9, 9, 11, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 24px rgba(52, 211, 153, 0.35);
+}
+
+/* Slim scrollbar for the chat list. */
+.scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+.scroll-slim::-webkit-scrollbar {
+  width: 6px;
+}
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Animations                                                          */
+/* ------------------------------------------------------------------ */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes float-up {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes radar-expand {
+  0% { transform: scale(0.15); opacity: 0.55; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+.animate-fade-in { animation: fade-in 0.5s ease both; }
+.animate-slide-in-right { animation: slide-in-right 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.animate-scale-in { animation: scale-in 0.22s ease both; }
+.animate-float-up { animation: float-up 0.3s ease both; }
+.animate-message-in { animation: message-in 0.25s ease both; }
+
+.status-dot { animation: status-pulse 1.6s ease-in-out infinite; }
+
+/* Expanding rings used on the entry screen. */
+.radar-ring {
+  position: absolute;
+  border-radius: 9999px;
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  animation: radar-expand 4.5s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot::after,
+  .pulse-me::after,
+  .radar-ring,
+  .status-dot {
+    animation: none;
   }
 }
