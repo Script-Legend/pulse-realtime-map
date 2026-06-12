@@ -6,22 +6,47 @@ import type { PollResponse, SignalType } from "@/lib/types";
 // id and is never shared with other peers.
 let sessionSecret: string | null = null;
 
+// Signaling rides a lossy DB mailbox over HTTP, and Neon free tier can return a
+// transient 5xx on cold start. A single dropped handshake message (offer /
+// answer / accept) would stall the WebRTC connection forever, so POST with a
+// few retries on transient failures (429 / 5xx / network). Non-transient 4xx
+// (400 / 401) return immediately.
+async function postWithRetry(
+  url: string,
+  body: string,
+  attempts = 4,
+): Promise<Response | null> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      if (res.ok) return res;
+      if (res.status !== 429 && res.status < 500) return res; // not transient
+    } catch {
+      // network blip — fall through to retry
+    }
+    if (i < attempts - 1) {
+      await new Promise((r) => setTimeout(r, 250 * (i + 1)));
+    }
+  }
+  return null;
+}
+
 export async function join(
   id: string,
   lat: number,
   lng: number,
 ): Promise<void> {
-  const res = await fetch("/api/join", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id, lat, lng }),
-  });
-  if (res.ok) {
+  const res = await postWithRetry("/api/join", JSON.stringify({ id, lat, lng }));
+  if (res && res.ok) {
     try {
       const data = await res.json();
       if (typeof data?.secret === "string") sessionSecret = data.secret;
     } catch {
-      // ignore — without a secret, later requests will simply be rejected
+      // ignore — without a secret, later requests will be rejected
     }
   }
 }
@@ -35,17 +60,20 @@ export async function poll(id: string): Promise<PollResponse> {
   return res.json();
 }
 
+// Returns true if the server accepted the signal. Handshake-critical messages
+// get the built-in retry above; a false result means it gave up after retries,
+// so the caller's connection watchdog can recover instead of hanging.
 export async function sendSignal(
   fromId: string,
   toId: string,
   type: SignalType,
   payload?: string,
-): Promise<void> {
-  await fetch("/api/signal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ fromId, toId, type, payload, secret: sessionSecret }),
-  });
+): Promise<boolean> {
+  const res = await postWithRetry(
+    "/api/signal",
+    JSON.stringify({ fromId, toId, type, payload, secret: sessionSecret }),
+  );
+  return !!res && res.ok;
 }
 
 // Fire-and-forget leave that survives the tab closing.

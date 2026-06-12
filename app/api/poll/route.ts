@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { STALE_MS, SIGNAL_TTL_MS } from "@/lib/presence";
 import { verifySession, isValidId } from "@/lib/session";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { dbErrorResponse } from "@/lib/http";
 import type { PollResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -88,7 +89,6 @@ export async function GET(request: NextRequest) {
 
     return Response.json(response);
   } catch (err) {
-    console.error("[api/poll]", err);
-    return Response.json({ error: "server error" }, { status: 500 });
+    return dbErrorResponse(err, "[api/poll]");
   }
 }

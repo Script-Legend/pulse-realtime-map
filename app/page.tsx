@@ -89,6 +89,7 @@ export default function Home() {
       onRemoteStream: (stream) => setRemoteStream(stream),
       onConnectionState: (state) => {
         if (state === "failed") {
+          void sendSignal(sessionId, peerId, "end");
           teardown("Connection failed (network).");
         }
       },
@@ -308,6 +309,22 @@ export default function Home() {
       window.removeEventListener("beforeunload", onLeave);
     };
   }, [sessionId, phase]);
+
+  // Watchdog: a connection can stall in "connecting" if a handshake signal was
+  // lost (a transient API error). Don't spin forever — after 15s, free the peer
+  // and let the user try again.
+  useEffect(() => {
+    if (conn.kind !== "connecting") return;
+    const timer = setTimeout(() => {
+      const c = connRef.current;
+      if (c.kind === "connecting") {
+        void sendSignal(sessionId, c.peerId, "end");
+        teardown("Connection failed. Please try again.");
+      }
+    }, 15_000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conn.kind, sessionId]);
 
   async function handleReady(lat: number, lng: number) {
     setMyLocation({ lat, lng });

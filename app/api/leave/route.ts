@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifySession, isValidId } from "@/lib/session";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { dbErrorResponse } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,6 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ ok: true });
   } catch (err) {
-    console.error("[api/leave]", err);
-    return Response.json({ error: "server error" }, { status: 500 });
+    return dbErrorResponse(err, "[api/leave]");
   }
 }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { applyPrivacyOffset, isValidLatLng } from "@/lib/geo";
 import { isValidId } from "@/lib/session";
 import { rateLimit, clientIp } from "@/lib/rateLimit";
+import { dbErrorResponse } from "@/lib/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,13 +52,13 @@ export async function POST(request: NextRequest) {
         lat: offset.lat,
         lng: offset.lng,
         lastSeen: new Date(),
+        busy: false,
         secret,
       },
     });
 
     return Response.json({ ok: true, secret });
   } catch (err) {
-    console.error("[api/join]", err);
-    return Response.json({ error: "server error" }, { status: 500 });
+    return dbErrorResponse(err, "[api/join]");
   }
 }
